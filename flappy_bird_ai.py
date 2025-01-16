@@ -230,11 +230,28 @@ while running:
     # Next state
     next_state = get_state()
 
-    # Store transition in replay buffer
+    # Calculate reward
     reward = 1.0 if not done else -100.0
     
-    reward += 0.1  # Small positive reward for surviving a frame
-    reward += score
+    # Reward for surviving a frame
+    reward += 0.1  
+
+    # Reward based on proximity to the opening of the pipes
+    nearest_pipe = None
+    for pipe in pipes:
+        if pipe.x + pipe_width > bird_x:
+            nearest_pipe = pipe
+            break
+
+    if nearest_pipe:
+        next_pipe_index = pipes.index(nearest_pipe)
+        top_pipe = pipes[next_pipe_index]
+        bottom_pipe = pipes[next_pipe_index + 1]
+
+        # Calculate the distance from the middle of the gap
+        mid_gap = (top_pipe.height + bottom_pipe.top) / 2
+        distance_to_mid_gap = abs(bird_y - mid_gap)
+        reward += max(0, 1.0 - distance_to_mid_gap / (pipe_gap / 2))  # Closer to middle = higher reward
 
     replay_buffer.push(state, action, reward, next_state, done)
 
@@ -258,10 +275,6 @@ while running:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        # Log training progress periodically
-        if current_time % 1000 == 0:
-            print(f"Loss: {loss.item():.4f}, Epsilon: {epsilon:.4f}")
 
     # Update target network periodically
     if current_time % 5000 == 0:
@@ -287,7 +300,6 @@ while running:
     clock.tick(FPS)
 
     if done:
-        # show_restart_screen()
         if score > high_score:
             high_score = score
         reset_game()
