@@ -82,7 +82,7 @@ class ReplayBuffer:
         return len(self.buffer)
 
 # AI settings
-state_dim = 5  # Bird's normalized state (y, velocity, nearest pipe info)
+state_dim = 7  # Bird's normalized state (y, velocity, nearest pipe info, distance to pipes, speed)
 action_dim = 2  # Actions: [Do nothing, Jump]
 learning_rate = 1e-3
 epsilon = 0.5  # Start exploration at 50%
@@ -112,15 +112,18 @@ def get_state():
         next_pipe_index = pipes.index(nearest_pipe)
         top_pipe = pipes[next_pipe_index]
         bottom_pipe = pipes[next_pipe_index + 1]
+        pipe_distance = top_pipe.x - bird_x
         return np.array([
             bird_y / SCREEN_HEIGHT,
             bird_velocity / 10.0,
             top_pipe.x / SCREEN_WIDTH,
             top_pipe.height / SCREEN_HEIGHT,
-            bottom_pipe.top / SCREEN_HEIGHT
+            bottom_pipe.top / SCREEN_HEIGHT,
+            pipe_distance / SCREEN_WIDTH,
+            pipe_velocity / 10.0
         ])
     else:
-        return np.array([bird_y / SCREEN_HEIGHT, bird_velocity / 10.0, 1.0, 0.0, 1.0])
+        return np.array([bird_y / SCREEN_HEIGHT, bird_velocity / 10.0, 1.0, 0.0, 1.0, 1.0, pipe_velocity / 10.0])
 
 # Function to create new pipes
 def create_pipe():
@@ -230,28 +233,15 @@ while running:
     # Next state
     next_state = get_state()
 
-    # Calculate reward
+    # Store transition in replay buffer
     reward = 1.0 if not done else -100.0
     
-    # Reward for surviving a frame
-    reward += 0.1  
-
-    # Reward based on proximity to the opening of the pipes
-    nearest_pipe = None
-    for pipe in pipes:
-        if pipe.x + pipe_width > bird_x:
-            nearest_pipe = pipe
-            break
-
-    if nearest_pipe:
-        next_pipe_index = pipes.index(nearest_pipe)
-        top_pipe = pipes[next_pipe_index]
-        bottom_pipe = pipes[next_pipe_index + 1]
-
-        # Calculate the distance from the middle of the gap
-        mid_gap = (top_pipe.height + bottom_pipe.top) / 2
-        distance_to_mid_gap = abs(bird_y - mid_gap)
-        reward += max(0, 1.0 - distance_to_mid_gap / (pipe_gap / 2))  # Closer to middle = higher reward
+    # Adjust reward with extra penalties and bonuses
+    if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
+        reward -= 10.0  # Penalize for hitting the top or bottom
+    
+    reward += 0.1  # Small positive reward for surviving a frame
+    reward += score
 
     replay_buffer.push(state, action, reward, next_state, done)
 
@@ -275,6 +265,10 @@ while running:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        # Log training progress periodically
+        if current_time % 1000 == 0:
+            print(f"Loss: {loss.item():.4f}, Epsilon: {epsilon:.4f}")
 
     # Update target network periodically
     if current_time % 5000 == 0:
@@ -300,6 +294,7 @@ while running:
     clock.tick(FPS)
 
     if done:
+        # show_restart_screen()
         if score > high_score:
             high_score = score
         reset_game()
