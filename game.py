@@ -2,19 +2,23 @@ import pygame
 import random
 import numpy as np
 
-# Game Constants
+# Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 400, 600
 BIRD_SIZE = 20
 PIPE_WIDTH = 50
 PIPE_GAP = 150
 GRAVITY = 0.5
 JUMP_STRENGTH = -10
-FPS = 60
+PIPE_SPEED = 5
+FPS = 60  
 
 class FlappyBirdGame:
-    def __init__(self):
+    def __init__(self, agent_id):
         pygame.init()
-        self.screen = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))  # Offscreen rendering
+        self.agent_id = agent_id
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption(f"Flappy Bird - Agent {agent_id}")
+
         self.clock = pygame.time.Clock()
         self.reset()
 
@@ -44,13 +48,13 @@ class FlappyBirdGame:
         self.bird_velocity += GRAVITY
         self.bird_y += self.bird_velocity
 
-        if self.frames_since_pipe >= FPS * 1.5:  # Pipes spawn every ~1.5 seconds
+        if self.frames_since_pipe >= FPS * 1.5:
             self.spawn_pipe()
             self.frames_since_pipe = 0
         self.frames_since_pipe += 1
 
         for pipe in self.pipes:
-            pipe.x -= 5
+            pipe.x -= PIPE_SPEED
 
         self.pipes = [pipe for pipe in self.pipes if pipe.x + PIPE_WIDTH > 0]
 
@@ -67,6 +71,25 @@ class FlappyBirdGame:
     def check_collision(self, pipe):
         return (pipe.x < 50 + BIRD_SIZE < pipe.x + PIPE_WIDTH and 
                 not (pipe.height < self.bird_y < pipe.height + PIPE_GAP))
+
+    def render(self):
+        self.screen.fill((135, 206, 250))  # Light blue background
+
+        # Draw pipes
+        for pipe in self.pipes:
+            pygame.draw.rect(self.screen, (0, 255, 0), (pipe.x, 0, PIPE_WIDTH, pipe.height))
+            pygame.draw.rect(self.screen, (0, 255, 0), (pipe.x, pipe.height + PIPE_GAP, PIPE_WIDTH, SCREEN_HEIGHT))
+
+        # Draw bird
+        pygame.draw.circle(self.screen, (255, 255, 0), (50, int(self.bird_y)), BIRD_SIZE)
+
+        # Display score
+        font = pygame.font.Font(None, 36)
+        score_text = font.render(f"Score: {self.score}", True, (255, 255, 255))
+        self.screen.blit(score_text, (10, 10))
+
+        pygame.display.flip()
+        self.clock.tick(FPS)
 
 class Pipe:
     def __init__(self, x, height):
