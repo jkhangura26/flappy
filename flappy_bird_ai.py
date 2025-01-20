@@ -234,14 +234,35 @@ while running:
     next_state = get_state()
 
     # Store transition in replay buffer
+    # Reward adjustments
     reward = 1.0 if not done else -100.0
-    
-    # Adjust reward with extra penalties and bonuses
+
+    # Penalize for hitting the top or bottom of the screen more harshly
     if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
-        reward -= 10.0  # Penalize for hitting the top or bottom
-    
-    reward += 0.1  # Small positive reward for surviving a frame
-    reward += score
+        reward -= 20.0  # Increase penalty for collision with top/bottom
+
+    # Give a small positive reward for surviving a frame
+    if high_score == 0:
+        reward += 0.1 
+
+
+    # Reward for passing pipes
+    for pipe in pipes:
+        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
+            reward += 1.0  # Reward for passing a pipe
+
+    # Extra reward for navigating through the gap successfully
+    # Example: If bird is close to the gap and has a good chance of passing it safely
+    # Track when the score increases and reward accordingly
+    last_score = score
+    for pipe in pipes:
+        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
+            score += 0.5  # Increment score for passing pipes
+            if score > last_score:  # Check if score has increased
+                reward += 1.0  # Reward for increasing score
+
+    # Use score as a dynamic reward to encourage staying alive longer
+    reward += score * 0.1  # Reward based on the score progression
 
     replay_buffer.push(state, action, reward, next_state, done)
 
