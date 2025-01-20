@@ -111,6 +111,11 @@ def show_restart_screen():
 
 # Game loop
 running = True
+clock = pygame.time.Clock()
+
+# Track last spawn time
+last_pipe_time = pygame.time.get_ticks()
+
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -137,20 +142,23 @@ while running:
     bird_y += bird_velocity
     bird_rect = pygame.Rect(bird_x, bird_y, bird_size, bird_size)
 
-    # Spawn pipes
+    # Spawn pipes based on FPS
     current_time = pygame.time.get_ticks()
-    if current_time - last_pipe_time > pipe_spawn_time:
-        top_pipe, bottom_pipe = create_pipe()  # Ensure pipes are created
-        pipes.extend([top_pipe, bottom_pipe])  # Add both pipes to the list
-        last_pipe_time = current_time  # Update last pipe time
+
+    # Time difference from the last spawn
+    time_since_last_pipe = current_time - last_pipe_time
+
+    # Spawn pipes based on the calculated pipe_spawn_time interval
+    if time_since_last_pipe > pipe_spawn_time:
+        pipes.extend(create_pipe())  # Create new pipes
+        last_pipe_time = current_time  # Update the last spawn time
 
     # Move pipes
     for pipe in pipes:
         pipe.x += pipe_velocity
 
     # Remove off-screen pipes and update score
-    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]  # Only keep pipes that are on screen
-
+    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
     for pipe in pipes:
         if pipe.x + pipe_width == bird_x:
             score += 0.5  # Increment by 0.5 for each pipe passed (top and bottom)
