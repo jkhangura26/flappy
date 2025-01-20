@@ -3,30 +3,11 @@ import sys
 import random
 import numpy as np
 import torch
+from config import *
+from ai import policy_net, target_net, optimizer, replay_buffer, epsilon, epsilon_decay, epsilon_min, gamma, batch_size, ReplayBuffer, DQN
 import torch.nn as nn
-import torch.optim as optim
-from collections import deque
 
-# Initialize Pygame
-pygame.init()
-
-# Screen settings
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 600
-FPS = 60
-
-# Colors
-WHITE = (255, 255, 255)
-BLUE = (135, 206, 250)
-GREEN = (0, 200, 0)
-RED = (200, 0, 0)
-
-# Initialize screen
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Flappy Bird")
-clock = pygame.time.Clock()
-
-# Bird settings
+# Game-specific variables
 bird_size = 20
 bird_x = 50
 bird_y = SCREEN_HEIGHT // 2
@@ -34,71 +15,15 @@ bird_velocity = 0
 gravity = 0.5
 jump_strength = -10
 
-# Pipe settings
 pipe_width = 50
 pipe_gap = 150
 pipe_velocity = -5
 pipes = []
-pipe_spawn_time = 1500  # Milliseconds
+pipe_spawn_time = 1500
 last_pipe_time = pygame.time.get_ticks()
 
-# Scoring
 score = 0
 high_score = 0
-font = pygame.font.SysFont(None, 36)
-
-# Neural Network for AI
-class DQN(nn.Module):
-    def __init__(self, input_dim, output_dim):
-        super(DQN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_dim)
-
-    def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        return self.fc3(x)
-
-# Replay Buffer
-class ReplayBuffer:
-    def __init__(self, capacity):
-        self.buffer = deque(maxlen=capacity)
-
-    def push(self, state, action, reward, next_state, done):
-        self.buffer.append((state, action, reward, next_state, done))
-
-    def sample(self, batch_size):
-        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        batch = [self.buffer[idx] for idx in indices]
-        states, actions, rewards, next_states, dones = zip(*batch)
-        return (np.array(states),
-                np.array(actions),
-                np.array(rewards),
-                np.array(next_states),
-                np.array(dones))
-
-    def __len__(self):
-        return len(self.buffer)
-
-# AI settings
-state_dim = 7  # Bird's normalized state (y, velocity, nearest pipe info, distance to pipes, speed)
-action_dim = 2  # Actions: [Do nothing, Jump]
-learning_rate = 1e-3
-epsilon = 0.5  # Start exploration at 50%
-epsilon_decay = 0.995
-epsilon_min = 0.01
-gamma = 0.99  # Discount factor
-batch_size = 64
-buffer_capacity = 10000
-
-policy_net = DQN(state_dim, action_dim)
-target_net = DQN(state_dim, action_dim)
-target_net.load_state_dict(policy_net.state_dict())
-target_net.eval()
-
-optimizer = optim.Adam(policy_net.parameters(), lr=learning_rate)
-replay_buffer = ReplayBuffer(buffer_capacity)
 
 # Function to get the current state
 def get_state():
@@ -196,7 +121,7 @@ while running:
     state_tensor = torch.FloatTensor(state).unsqueeze(0)
 
     if random.random() < epsilon:
-        action = random.randint(0, action_dim - 1)  # Exploration
+        action = random.randint(0, 1)  # Exploration
     else:
         with torch.no_grad():
             q_values = policy_net(state_tensor)
@@ -234,36 +159,7 @@ while running:
     next_state = get_state()
 
     # Store transition in replay buffer
-    # Reward adjustments
     reward = 1.0 if not done else -100.0
-
-    # Penalize for hitting the top or bottom of the screen more harshly
-    if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
-        reward -= 20.0  # Increase penalty for collision with top/bottom
-
-    # Give a small positive reward for surviving a frame
-    if high_score == 0:
-        reward += 0.1 
-
-
-    # Reward for passing pipes
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            reward += 1.0  # Reward for passing a pipe
-
-    # Extra reward for navigating through the gap successfully
-    # Example: If bird is close to the gap and has a good chance of passing it safely
-    # Track when the score increases and reward accordingly
-    last_score = score
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            score += 0.5  # Increment score for passing pipes
-            if score > last_score:  # Check if score has increased
-                reward += 1.0  # Reward for increasing score
-
-    # Use score as a dynamic reward to encourage staying alive longer
-    reward += score * 0.1  # Reward based on the score progression
-
     replay_buffer.push(state, action, reward, next_state, done)
 
     # Update Q-network
@@ -286,10 +182,6 @@ while running:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        # Log training progress periodically
-        if current_time % 1000 == 0:
-            print(f"Loss: {loss.item():.4f}, Epsilon: {epsilon:.4f}")
 
     # Update target network periodically
     if current_time % 5000 == 0:
@@ -315,7 +207,6 @@ while running:
     clock.tick(FPS)
 
     if done:
-        # show_restart_screen()
         if score > high_score:
             high_score = score
         reset_game()
