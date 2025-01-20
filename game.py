@@ -20,7 +20,7 @@ pipe_width = 50
 pipe_gap = 150
 pipe_velocity = -5
 pipes = []
-pipe_spawn_time = 1500
+pipe_spawn_time = SPAWN_TIME_PIPE
 last_pipe_time = pygame.time.get_ticks()
 
 score = 0
@@ -195,7 +195,7 @@ while running:
         optimizer.step()
 
     # Update target network periodically
-    if current_time % 5000 == 0:
+    if current_time % TARGET_NETWORK_UPDATE_TIME == 0:
         target_net.load_state_dict(policy_net.state_dict())
 
     # Decay epsilon
