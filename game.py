@@ -1,4 +1,3 @@
-import pygame
 import sys
 import random
 import numpy as np
@@ -25,6 +24,7 @@ last_pipe_time = pygame.time.get_ticks()
 
 score = 0
 high_score = 0
+death_count = 0  # Track number of deaths
 
 # Function to get the current state
 def get_state():
@@ -76,39 +76,6 @@ def reset_game():
     score = 0
     last_pipe_time = pygame.time.get_ticks()
 
-# Function to display the restart screen
-def show_restart_screen():
-    global high_score, score
-    if score > high_score:
-        high_score = score
-    
-    screen.fill(BLUE)
-    game_over_text = font.render("Game Over!", True, RED)
-    score_text = font.render(f"Score: {int(score)}", True, WHITE)
-    high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
-    restart_text = font.render("Press R to Restart or Q to Quit", True, WHITE)
-
-    screen.blit(game_over_text, (SCREEN_WIDTH // 2 - game_over_text.get_width() // 2, SCREEN_HEIGHT // 2 - 70))
-    screen.blit(score_text, (SCREEN_WIDTH // 2 - score_text.get_width() // 2, SCREEN_HEIGHT // 2 - 20))
-    screen.blit(high_score_text, (SCREEN_WIDTH // 2 - high_score_text.get_width() // 2, SCREEN_HEIGHT // 2 + 20))
-    screen.blit(restart_text, (SCREEN_WIDTH // 2 - restart_text.get_width() // 2, SCREEN_HEIGHT // 2 + 70))
-
-    pygame.display.flip()
-
-    waiting = True
-    while waiting:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
-                    waiting = False
-                    reset_game()
-                if event.key == pygame.K_q:
-                    pygame.quit()
-                    sys.exit()
-
 # Game loop
 running = True
 clock = pygame.time.Clock()
@@ -117,11 +84,6 @@ clock = pygame.time.Clock()
 last_pipe_time = pygame.time.get_ticks()
 
 while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
     # AI decision-making
     state = get_state()
     state_tensor = torch.FloatTensor(state).unsqueeze(0)
@@ -201,23 +163,9 @@ while running:
     # Decay epsilon
     epsilon = max(epsilon * epsilon_decay, epsilon_min)
 
-    # Render
-    screen.fill(BLUE)  # Background color
-    pygame.draw.rect(screen, RED, bird_rect)  # Bird
-
-    for pipe in pipes:
-        pygame.draw.rect(screen, GREEN, pipe)  # Pipes
-
-    # Display score
-    score_text = font.render(f"Score: {int(score)}", True, WHITE)
-    high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
-    screen.blit(score_text, (10, 10))
-    screen.blit(high_score_text, (10, 40))
-
-    pygame.display.flip()
-    clock.tick(FPS)
-
     if done:
         if score > high_score:
             high_score = score
+        death_count += 1  # Increment death count
+        print(f"Game Over! Score: {int(score)} | High Score: {int(high_score)} | Deaths: {death_count}")
         reset_game()
