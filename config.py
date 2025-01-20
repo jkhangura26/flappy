@@ -6,7 +6,7 @@ pygame.init()
 # Screen settings
 SCREEN_WIDTH = 400
 SCREEN_HEIGHT = 600
-FPS = 60
+FPS = 6000000
 
 # Colors
 WHITE = (255, 255, 255)

@@ -140,15 +140,17 @@ while running:
     # Spawn pipes
     current_time = pygame.time.get_ticks()
     if current_time - last_pipe_time > pipe_spawn_time:
-        pipes.extend(create_pipe())
-        last_pipe_time = current_time
+        top_pipe, bottom_pipe = create_pipe()  # Ensure pipes are created
+        pipes.extend([top_pipe, bottom_pipe])  # Add both pipes to the list
+        last_pipe_time = current_time  # Update last pipe time
 
     # Move pipes
     for pipe in pipes:
         pipe.x += pipe_velocity
 
     # Remove off-screen pipes and update score
-    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
+    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]  # Only keep pipes that are on screen
+
     for pipe in pipes:
         if pipe.x + pipe_width == bird_x:
             score += 0.5  # Increment by 0.5 for each pipe passed (top and bottom)
