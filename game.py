@@ -6,6 +6,7 @@ import torch
 from config import *
 from ai import policy_net, target_net, optimizer, replay_buffer, epsilon, epsilon_decay, epsilon_min, gamma, batch_size, ReplayBuffer, DQN
 import torch.nn as nn
+from ai import calculate_reward
 
 # Game-specific variables
 bird_size = 20
@@ -159,7 +160,7 @@ while running:
     next_state = get_state()
 
     # Store transition in replay buffer
-    reward = 1.0 if not done else -100.0
+    reward = calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width)
     replay_buffer.push(state, action, reward, next_state, done)
 
     # Update Q-network
