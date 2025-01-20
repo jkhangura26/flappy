@@ -7,27 +7,54 @@ from ai import policy_net, target_net, optimizer, replay_buffer, epsilon, epsilo
 import torch.nn as nn
 from ai import calculate_reward
 
+# Define the buffer_capacity if not defined in config.py
+buffer_capacity = 1000000  # Add this line to define buffer capacity
+
 # Game-specific variables
 bird_size = 20
 bird_x = 50
-bird_y = SCREEN_HEIGHT // 2
-bird_velocity = 0
 gravity = 0.5
 jump_strength = -10
 
 pipe_width = 50
 pipe_gap = 150
 pipe_velocity = -5
-pipes = []
 pipe_spawn_time = SPAWN_TIME_PIPE
-last_pipe_time = pygame.time.get_ticks()
 
-score = 0
-high_score = 0
-death_count = 0  # Track number of deaths
+# Number of agents to run in parallel
+num_agents = 10
 
-# Function to get the current state
-def get_state():
+
+# Initialize death_count variable outside the game loop
+death_count = 0
+
+# List of agents
+agents = []
+
+# Initialize agents (Each agent has its own DQN, replay buffer, and variables)
+for i in range(num_agents):
+    agent = {
+        'id': i,
+        'bird_y': SCREEN_HEIGHT // 2,
+        'bird_velocity': 0,
+        'pipes': [],
+        'score': 0,
+        'high_score': 0,  # Initialize individual high score for each agent
+        'last_pipe_time': pygame.time.get_ticks(),
+        'epsilon': epsilon,
+        'policy_net': DQN(7, 2),  # Each agent has its own DQN for individual experience
+        'target_net': DQN(7, 2),
+        'replay_buffer': ReplayBuffer(buffer_capacity),
+    }
+    agent['target_net'].load_state_dict(agent['policy_net'].state_dict())
+    agent['target_net'].eval()
+    agents.append(agent)
+
+# Function to get the current state for a single agent
+def get_state(agent):
+    bird_y = agent['bird_y']
+    pipes = agent['pipes']
+    bird_x = 50  # All agents share same X position
     nearest_pipe = None
     for pipe in pipes:
         if pipe.x + pipe_width > bird_x:
@@ -41,7 +68,7 @@ def get_state():
         pipe_distance = top_pipe.x - bird_x
         return np.array([
             bird_y / SCREEN_HEIGHT,
-            bird_velocity / 10.0,
+            agent['bird_velocity'] / 10.0,
             top_pipe.x / SCREEN_WIDTH,
             top_pipe.height / SCREEN_HEIGHT,
             bottom_pipe.top / SCREEN_HEIGHT,
@@ -49,7 +76,7 @@ def get_state():
             pipe_velocity / 10.0
         ])
     else:
-        return np.array([bird_y / SCREEN_HEIGHT, bird_velocity / 10.0, 1.0, 0.0, 1.0, 1.0, pipe_velocity / 10.0])
+        return np.array([bird_y / SCREEN_HEIGHT, agent['bird_velocity'] / 10.0, 1.0, 0.0, 1.0, 1.0, pipe_velocity / 10.0])
 
 # Function to create new pipes
 def create_pipe():
@@ -58,23 +85,22 @@ def create_pipe():
     bottom_pipe = pygame.Rect(SCREEN_WIDTH, pipe_height + pipe_gap, pipe_width, SCREEN_HEIGHT - pipe_height - pipe_gap)
     return top_pipe, bottom_pipe
 
-# Function to check collisions
-def check_collision(bird_rect, pipes):
-    for pipe in pipes:
+# Function to check collisions for a single agent
+def check_collision(agent, bird_rect):
+    for pipe in agent['pipes']:
         if bird_rect.colliderect(pipe):
             return True
     if bird_rect.top <= 0 or bird_rect.bottom >= SCREEN_HEIGHT:
         return True
     return False
 
-# Function to reset the game
-def reset_game():
-    global bird_y, bird_velocity, pipes, score, last_pipe_time
-    bird_y = SCREEN_HEIGHT // 2
-    bird_velocity = 0
-    pipes = []
-    score = 0
-    last_pipe_time = pygame.time.get_ticks()
+# Function to reset the game for a single agent
+def reset_game(agent):
+    agent['bird_y'] = SCREEN_HEIGHT // 2
+    agent['bird_velocity'] = 0
+    agent['pipes'] = []
+    agent['score'] = 0
+    agent['last_pipe_time'] = pygame.time.get_ticks()
 
 # Game loop
 running = True
@@ -84,88 +110,92 @@ clock = pygame.time.Clock()
 last_pipe_time = pygame.time.get_ticks()
 
 while running:
-    # AI decision-making
-    state = get_state()
-    state_tensor = torch.FloatTensor(state).unsqueeze(0)
-
-    if random.random() < epsilon:
-        action = random.randint(0, 1)  # Exploration
-    else:
-        with torch.no_grad():
-            q_values = policy_net(state_tensor)
-            action = torch.argmax(q_values).item()  # Exploitation
-
-    # Apply action
-    if action == 1:  # Jump
-        bird_velocity = jump_strength
-
-    # Update bird position
-    bird_velocity += gravity
-    bird_y += bird_velocity
-    bird_rect = pygame.Rect(bird_x, bird_y, bird_size, bird_size)
-
-    # Spawn pipes based on FPS
     current_time = pygame.time.get_ticks()
 
-    # Time difference from the last spawn
-    time_since_last_pipe = current_time - last_pipe_time
+    for agent in agents:
+        # AI decision-making for each agent
+        state = get_state(agent)
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
 
-    # Spawn pipes based on the calculated pipe_spawn_time interval
-    if time_since_last_pipe > pipe_spawn_time:
-        pipes.extend(create_pipe())  # Create new pipes
-        last_pipe_time = current_time  # Update the last spawn time
+        if random.random() < agent['epsilon']:
+            action = random.randint(0, 1)  # Exploration
+        else:
+            with torch.no_grad():
+                q_values = agent['policy_net'](state_tensor)
+                action = torch.argmax(q_values).item()  # Exploitation
 
-    # Move pipes
-    for pipe in pipes:
-        pipe.x += pipe_velocity
+        # Apply action for the agent
+        if action == 1:  # Jump
+            agent['bird_velocity'] = jump_strength
 
-    # Remove off-screen pipes and update score
-    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:
-            score += 0.5  # Increment by 0.5 for each pipe passed (top and bottom)
+        # Update bird position for the agent
+        agent['bird_velocity'] += gravity
+        agent['bird_y'] += agent['bird_velocity']
+        bird_rect = pygame.Rect(bird_x, agent['bird_y'], bird_size, bird_size)
 
-    # Check for collisions
-    done = check_collision(bird_rect, pipes)
+        # Spawn pipes based on FPS
+        time_since_last_pipe = current_time - agent['last_pipe_time']
+        if time_since_last_pipe > pipe_spawn_time:
+            agent['pipes'].extend(create_pipe())  # Create new pipes
+            agent['last_pipe_time'] = current_time  # Update the last spawn time
 
-    # Next state
-    next_state = get_state()
+        # Move pipes
+        for pipe in agent['pipes']:
+            pipe.x += pipe_velocity
 
-    # Store transition in replay buffer
-    reward = calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width)
-    replay_buffer.push(state, action, reward, next_state, done)
+        # Remove off-screen pipes and update score
+        agent['pipes'] = [pipe for pipe in agent['pipes'] if pipe.x + pipe_width > 0]
+        for pipe in agent['pipes']:
+            if pipe.x + pipe_width == bird_x:
+                agent['score'] += 0.5  # Increment by 0.5 for each pipe passed (top and bottom)
 
-    # Update Q-network
-    if len(replay_buffer) > batch_size:
-        states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
+        # Check for collisions
+        done = check_collision(agent, bird_rect)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        # Next state for agent
+        next_state = get_state(agent)
 
-        q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        with torch.no_grad():
-            max_next_q_values = target_net(next_states).max(1)[0]
-            target_q_values = rewards + gamma * max_next_q_values * (1 - dones)
+        # Store transition in replay buffer
+        reward = calculate_reward(done, agent['bird_y'], bird_size, agent['score'], agent['pipes'], bird_x, agent['high_score'], SCREEN_HEIGHT, pipe_width)
+        agent['replay_buffer'].push(state, action, reward, next_state, done)
 
-        loss = nn.MSELoss()(q_values, target_q_values)
+        # Update Q-network for the agent
+        if len(agent['replay_buffer']) > batch_size:
+            states, actions, rewards, next_states, dones = agent['replay_buffer'].sample(batch_size)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            states = torch.FloatTensor(states)
+            actions = torch.LongTensor(actions)
+            rewards = torch.FloatTensor(rewards)
+            next_states = torch.FloatTensor(next_states)
+            dones = torch.FloatTensor(dones)
 
-    # Update target network periodically
-    if current_time % TARGET_NETWORK_UPDATE_TIME == 0:
-        target_net.load_state_dict(policy_net.state_dict())
+            q_values = agent['policy_net'](states).gather(1, actions.unsqueeze(1)).squeeze(1)
+            with torch.no_grad():
+                max_next_q_values = agent['target_net'](next_states).max(1)[0]
+                target_q_values = rewards + gamma * max_next_q_values * (1 - dones)
 
-    # Decay epsilon
-    epsilon = max(epsilon * epsilon_decay, epsilon_min)
+            loss = nn.MSELoss()(q_values, target_q_values)
 
-    if done:
-        if score > high_score:
-            high_score = score
-        death_count += 1  # Increment death count
-        print(f"Game Over! Score: {int(score)} | High Score: {int(high_score)} | Deaths: {death_count}")
-        reset_game()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        # Update target network periodically
+        if current_time % TARGET_NETWORK_UPDATE_TIME == 0:
+            agent['target_net'].load_state_dict(agent['policy_net'].state_dict())
+
+        # Decay epsilon for the agent
+        agent['epsilon'] = max(agent['epsilon'] * epsilon_decay, epsilon_min)
+
+        # If done, reset the agent
+        if done:
+            if agent['score'] > agent['high_score']:
+                agent['high_score'] = agent['score']  # Update high score for this agent
+            death_count += 1  # Increment death count
+            print(f"Agent {agent['id']} Game Over! Score: {int(agent['score'])} | High Score: {int(agent['high_score'])} | Deaths: {death_count}")
+            reset_game(agent)
+
+    # Shared Training: After all agents have completed an update, synchronize the policy network
+    # This step ensures that all agents are using the same policy net after training.
+    for agent in agents:
+        agent['policy_net'].load_state_dict(policy_net.state_dict())
