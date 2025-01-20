@@ -19,6 +19,7 @@ class FlappyBirdGame:
         self.reset()
 
     def reset(self):
+        print("Score: {self.score}")
         self.bird_y = SCREEN_HEIGHT // 2
         self.bird_velocity = 0
         self.pipes = []
