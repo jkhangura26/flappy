@@ -59,42 +59,43 @@ replay_buffer = ReplayBuffer(buffer_capacity)
 
 # Reward Configuration
 def calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width):
-    reward = 1.0 if not done else -100.0  # Negative reward for game over
+    reward = 1.0 if not done else -200.0  # Heavier penalty for game over
 
     # Penalize for hitting the top or bottom of the screen
     if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
-        reward -= 20.0  # Increase penalty for collision with top/bottom
+        reward -= 50.0  # Increased penalty for collision with top/bottom
+
+    # Penalize for being dangerously close to the top or bottom
+    if bird_y < 50 or bird_y > SCREEN_HEIGHT - bird_size - 50:
+        reward -= 5.0  # Small penalty to discourage staying too close to edges
 
     # Reward for surviving a frame
-    reward += 0.1
+    reward += 0.1  
 
     # Reward for passing pipes (each pipe pair passed)
     for pipe in pipes:
         if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            reward += 1.0  # Reward for passing a pipe
+            reward += 3.0  # Higher reward for successfully passing a pipe
 
-    # Reward for staying alive longer (based on score progression)
-    reward += score * 0.1  # Increase reward based on score
-
-    # Reward for navigating through the gap successfully
+    # Additional reward for navigating through the gap successfully
     last_score = score
     for pipe in pipes:
         if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            score += 0.5  # Increment score for passing pipes
-            if score > last_score:  # Check if score has increased
-                reward += 2.0  # Reward for increasing score (extra for successful gap navigation)
+            score += 0.5
+            if score > last_score:
+                reward += 5.0  # Extra reward for successfully avoiding obstacles
 
     # Encourage survival for longer by rewarding staying alive
     if high_score == 0:
-        reward += 0.1  # Small positive reward for staying alive in the beginning
+        reward += 0.1  # Small positive reward for staying alive early on
 
-    # Give larger rewards for staying alive and avoiding immediate danger
-    if bird_y > 0 and bird_y < SCREEN_HEIGHT - bird_size:
-        reward += 0.5  # Reward for staying in the middle portion of the screen
+    # Reward for staying in the middle portion of the screen
+    if SCREEN_HEIGHT * 0.25 < bird_y < SCREEN_HEIGHT * 0.75:
+        reward += 1.0  # Reward for staying in a safer middle zone
 
-    # Encourage movement towards pipe gaps (avoiding top and bottom)
+    # Penalize collision with pipes
     for pipe in pipes:
-        if pipe.top <= bird_y <= pipe.bottom:
-            reward += 0.5  # Reward for being in the safe gap area
+        if pipe.collidepoint(bird_x, bird_y):
+            reward -= 100.0  # Major penalty for hitting pipes
 
     return reward

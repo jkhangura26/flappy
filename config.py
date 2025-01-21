@@ -4,14 +4,14 @@ import pygame
 pygame.init()
 
 # Number of agents
-AGENTS = 3
+AGENTS = 1000
 
 # Screen settings: Modify the width based on the number of agents
-SCREEN_WIDTH = 400 * AGENTS  # Larger width for multiple games
+SCREEN_WIDTH = 600
 SCREEN_HEIGHT = 600
 FPS = 600
-TARGET_NETWORK_UPDATE_TIME = 100
-SPAWN_TIME_PIPE = 750
+TARGET_NETWORK_UPDATE_TIME = 150
+SPAWN_TIME_PIPE = 1000
 
 # Colors
 WHITE = (255, 255, 255)
