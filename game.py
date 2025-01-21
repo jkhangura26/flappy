@@ -109,9 +109,8 @@ def show_restart_screen():
                     pygame.quit()
                     sys.exit()
 
-# Initialize separate game windows for each agent
 def run_game(agent_id, epsilon_value):
-    global bird_y, bird_velocity, pipes, score, high_score  # Mark high_score as global
+    global bird_y, bird_velocity, pipes, score, high_score  # Ensure score is managed properly
 
     pygame.init()
 
@@ -121,10 +120,12 @@ def run_game(agent_id, epsilon_value):
     
     clock = pygame.time.Clock()
 
+    # Initialize score and high_score for this agent
+    score = 0
+    high_score = 0  # Reset high score for each agent
+
     # Game loop
     running = True
-
-    # Track last spawn time
     last_pipe_time = pygame.time.get_ticks()
 
     while running:
@@ -202,13 +203,18 @@ def run_game(agent_id, epsilon_value):
         # Decay epsilon
         epsilon_value = max(epsilon_value * epsilon_decay, epsilon_min)
 
-        # Render the game
+        # Increment score for passing pipes
+        for pipe in pipes:
+            if pipe.x + pipe_width == bird_x:  # Bird passes the pipe
+                score += 0.5  # Increment score (you can adjust the increment as needed)
+
+        # Display the game and update score
         screen.fill(BLUE)
         pygame.draw.rect(screen, RED, bird_rect)
         for pipe in pipes:
             pygame.draw.rect(screen, GREEN, pipe)
 
-        # Display score
+        # Update and display score and high_score for the current agent
         score_text = font.render(f"Score: {int(score)}", True, WHITE)
         high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
         screen.blit(score_text, (10, 10))
@@ -217,10 +223,13 @@ def run_game(agent_id, epsilon_value):
         pygame.display.flip()
         clock.tick(FPS)
 
+        # If done (game over), reset the game for this agent
         if done:
             if score > high_score:
-                high_score = score
-            reset_game()
+                high_score = score  # Update high_score if needed
+            reset_game()  # This will reset score to 0
+
+
 
 
 if __name__ == "__main__":
