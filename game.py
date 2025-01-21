@@ -114,6 +114,9 @@ def run_game(agent_id, epsilon_value):
 
     pygame.init()
 
+    # Define game offset for each agent (space them side by side)
+    x_offset = SCREEN_WIDTH // AGENTS * agent_id
+
     # Create a new display window for each agent
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption(f"Flappy Bird - Agent {agent_id}")
@@ -151,7 +154,7 @@ def run_game(agent_id, epsilon_value):
 
         bird_velocity += gravity
         bird_y += bird_velocity
-        bird_rect = pygame.Rect(bird_x, bird_y, bird_size, bird_size)
+        bird_rect = pygame.Rect(bird_x + x_offset, bird_y, bird_size, bird_size)  # Adjust for offset
 
         # Manage pipes
         current_time = pygame.time.get_ticks()
@@ -208,7 +211,7 @@ def run_game(agent_id, epsilon_value):
             if pipe.x + pipe_width == bird_x:  # Bird passes the pipe
                 score += 0.5  # Increment score (you can adjust the increment as needed)
 
-        # Display the game and update score
+        # Display the game and update score for the current agent
         screen.fill(BLUE)
         pygame.draw.rect(screen, RED, bird_rect)
         for pipe in pipes:
@@ -217,8 +220,8 @@ def run_game(agent_id, epsilon_value):
         # Update and display score and high_score for the current agent
         score_text = font.render(f"Score: {int(score)}", True, WHITE)
         high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
-        screen.blit(score_text, (10, 10))
-        screen.blit(high_score_text, (10, 40))
+        screen.blit(score_text, (x_offset + 10, 10))  # Adjust text position for agent
+        screen.blit(high_score_text, (x_offset + 10, 40))
 
         pygame.display.flip()
         clock.tick(FPS)
@@ -229,11 +232,8 @@ def run_game(agent_id, epsilon_value):
                 high_score = score  # Update high_score if needed
             reset_game()  # This will reset score to 0
 
-
-
-
 if __name__ == "__main__":
-    agents = 3  # Define the number of agents
+    agents = AGENTS  # Define the number of agents
     epsilon_value = epsilon  # Get the epsilon value from ai.py
 
     # Run each agent in a separate game loop
