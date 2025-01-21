@@ -11,7 +11,7 @@ from ai import calculate_reward
 # Game-specific variables
 bird_size = 20
 bird_x = 50
-bird_y = SCREEN_HEIGHT // 2
+bird_y = SCREEN_HEIGHT // 2  # Initialize bird_y globally
 bird_velocity = 0
 gravity = 0.5
 jump_strength = -10
@@ -109,115 +109,124 @@ def show_restart_screen():
                     pygame.quit()
                     sys.exit()
 
-# Game loop
-running = True
-clock = pygame.time.Clock()
+# Initialize separate game windows for each agent
+def run_game(agent_id, epsilon_value):
+    global bird_y, bird_velocity, pipes, score, high_score  # Mark high_score as global
 
-# Track last spawn time
-last_pipe_time = pygame.time.get_ticks()
+    pygame.init()
 
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+    # Create a new display window for each agent
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption(f"Flappy Bird - Agent {agent_id}")
+    
+    clock = pygame.time.Clock()
 
-    # AI decision-making
-    state = get_state()
-    state_tensor = torch.FloatTensor(state).unsqueeze(0)
+    # Game loop
+    running = True
 
-    if random.random() < epsilon:
-        action = random.randint(0, 1)  # Exploration
-    else:
-        with torch.no_grad():
-            q_values = policy_net(state_tensor)
-            action = torch.argmax(q_values).item()  # Exploitation
+    # Track last spawn time
+    last_pipe_time = pygame.time.get_ticks()
 
-    # Apply action
-    if action == 1:  # Jump
-        bird_velocity = jump_strength
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
 
-    # Update bird position
-    bird_velocity += gravity
-    bird_y += bird_velocity
-    bird_rect = pygame.Rect(bird_x, bird_y, bird_size, bird_size)
+        # Run AI logic for the agent
+        state = get_state()
+        state_tensor = torch.FloatTensor(state).unsqueeze(0)
 
-    # Spawn pipes based on FPS
-    current_time = pygame.time.get_ticks()
+        # Exploration or Exploitation based on epsilon
+        if random.random() < epsilon_value:
+            action = random.randint(0, 1)  # Exploration
+        else:
+            with torch.no_grad():
+                q_values = policy_net(state_tensor)
+                action = torch.argmax(q_values).item()  # Exploitation
 
-    # Time difference from the last spawn
-    time_since_last_pipe = current_time - last_pipe_time
+        if action == 1:  # Jump
+            bird_velocity = jump_strength
 
-    # Spawn pipes based on the calculated pipe_spawn_time interval
-    if time_since_last_pipe > pipe_spawn_time:
-        pipes.extend(create_pipe())  # Create new pipes
-        last_pipe_time = current_time  # Update the last spawn time
+        bird_velocity += gravity
+        bird_y += bird_velocity
+        bird_rect = pygame.Rect(bird_x, bird_y, bird_size, bird_size)
 
-    # Move pipes
-    for pipe in pipes:
-        pipe.x += pipe_velocity
+        # Manage pipes
+        current_time = pygame.time.get_ticks()
+        time_since_last_pipe = current_time - last_pipe_time
 
-    # Remove off-screen pipes and update score
-    pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:
-            score += 0.5  # Increment by 0.5 for each pipe passed (top and bottom)
+        if time_since_last_pipe > pipe_spawn_time:
+            pipes.extend(create_pipe())  # Create new pipes
+            last_pipe_time = current_time
 
-    # Check for collisions
-    done = check_collision(bird_rect, pipes)
+        # Move pipes
+        for pipe in pipes:
+            pipe.x += pipe_velocity
 
-    # Next state
-    next_state = get_state()
+        pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
 
-    # Store transition in replay buffer
-    reward = calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width)
-    replay_buffer.push(state, action, reward, next_state, done)
+        # Check collisions
+        done = check_collision(bird_rect, pipes)
 
-    # Update Q-network
-    if len(replay_buffer) > batch_size:
-        states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
+        # Calculate reward and store transition in replay buffer
+        next_state = get_state()
+        reward = calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width)
+        replay_buffer.push(state, action, reward, next_state, done)
 
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        rewards = torch.FloatTensor(rewards)
-        next_states = torch.FloatTensor(next_states)
-        dones = torch.FloatTensor(dones)
+        # Update Q-network
+        if len(replay_buffer) > batch_size:
+            states, actions, rewards, next_states, dones = replay_buffer.sample(batch_size)
 
-        q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
-        with torch.no_grad():
-            max_next_q_values = target_net(next_states).max(1)[0]
-            target_q_values = rewards + gamma * max_next_q_values * (1 - dones)
+            states = torch.FloatTensor(states)
+            actions = torch.LongTensor(actions)
+            rewards = torch.FloatTensor(rewards)
+            next_states = torch.FloatTensor(next_states)
+            dones = torch.FloatTensor(dones)
 
-        loss = nn.MSELoss()(q_values, target_q_values)
+            q_values = policy_net(states).gather(1, actions.unsqueeze(1)).squeeze(1)
+            with torch.no_grad():
+                max_next_q_values = target_net(next_states).max(1)[0]
+                target_q_values = rewards + gamma * max_next_q_values * (1 - dones)
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+            loss = nn.MSELoss()(q_values, target_q_values)
 
-    # Update target network periodically
-    if current_time % TARGET_NETWORK_UPDATE_TIME == 0:
-        target_net.load_state_dict(policy_net.state_dict())
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
 
-    # Decay epsilon
-    epsilon = max(epsilon * epsilon_decay, epsilon_min)
+        # Update target network periodically
+        if current_time % TARGET_NETWORK_UPDATE_TIME == 0:
+            target_net.load_state_dict(policy_net.state_dict())
 
-    # Render
-    screen.fill(BLUE)  # Background color
-    pygame.draw.rect(screen, RED, bird_rect)  # Bird
+        # Decay epsilon
+        epsilon_value = max(epsilon_value * epsilon_decay, epsilon_min)
 
-    for pipe in pipes:
-        pygame.draw.rect(screen, GREEN, pipe)  # Pipes
+        # Render the game
+        screen.fill(BLUE)
+        pygame.draw.rect(screen, RED, bird_rect)
+        for pipe in pipes:
+            pygame.draw.rect(screen, GREEN, pipe)
 
-    # Display score
-    score_text = font.render(f"Score: {int(score)}", True, WHITE)
-    high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
-    screen.blit(score_text, (10, 10))
-    screen.blit(high_score_text, (10, 40))
+        # Display score
+        score_text = font.render(f"Score: {int(score)}", True, WHITE)
+        high_score_text = font.render(f"High Score: {int(high_score)}", True, WHITE)
+        screen.blit(score_text, (10, 10))
+        screen.blit(high_score_text, (10, 40))
 
-    pygame.display.flip()
-    clock.tick(FPS)
+        pygame.display.flip()
+        clock.tick(FPS)
 
-    if done:
-        if score > high_score:
-            high_score = score
-        reset_game()
+        if done:
+            if score > high_score:
+                high_score = score
+            reset_game()
+
+
+if __name__ == "__main__":
+    agents = 3  # Define the number of agents
+    epsilon_value = epsilon  # Get the epsilon value from ai.py
+
+    # Run each agent in a separate game loop
+    for agent_id in range(agents):
+        run_game(agent_id, epsilon_value)
