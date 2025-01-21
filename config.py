@@ -19,6 +19,18 @@ BLUE = (135, 206, 250)
 GREEN = (0, 200, 0)
 RED = (200, 0, 0)
 
+# Game-specific variables
+bird_size = 20
+bird_x = 50
+bird_y = SCREEN_HEIGHT // 2  # Initialize bird_y globally
+bird_velocity = 0
+gravity = 0.5
+jump_strength = -10
+
+pipe_width = 50
+pipe_gap = 150
+pipe_velocity = -5
+
 # Initialize screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird - Multiple Agents")
