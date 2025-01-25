@@ -117,11 +117,11 @@ def run_game(agents):
 
                 # Update score
                 for pipe in pipes:
-                    if abs((pipe.x + pipe_width) - agent['bird_x']) < 3:
+                    if abs((pipe.x + pipe_width) - agent['bird_x']) <= 1:
                         # Use pipe position as unique identifier
                         pipe_id = (pipe.x, pipe.height)
                         if pipe_id not in agent['passed_pipes']:
-                            agent['score'] += 1
+                            agent['score'] += 0.5
                             agent['passed_pipes'][pipe_id] = True
 
                 # Update high score
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     # Initialize agents with identical starting positions
     agents = [{
         'id': i,
-        'bird_x': SCREEN_WIDTH // 4 + (i * 50),
+        'bird_x': SCREEN_WIDTH // 4,
         'bird_y': SCREEN_HEIGHT // 2,
         'bird_velocity': 0,
         'score': 0,
