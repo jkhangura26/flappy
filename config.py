@@ -31,6 +31,19 @@ pipe_width = 50
 pipe_gap = 150
 pipe_velocity = -5
 
+# config.py
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 600
+AGENTS = 4
+BIRD_SIZE = 20
+GRAVITY = 0.5
+JUMP_STRENGTH = -8
+PIPE_WIDTH = 50
+PIPE_VELOCITY = -3
+SPAWN_TIME_PIPE = 1500
+TARGET_NETWORK_UPDATE_TIME = 1000
+# Add other constants as needed
+
 # Initialize screen
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Flappy Bird - Multiple Agents")
