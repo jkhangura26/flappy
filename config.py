@@ -20,18 +20,10 @@ GREEN = (0, 200, 0)
 RED = (200, 0, 0)
 
 # Game-specific variables
-bird_size = 20
 bird_x = 50
 bird_y = SCREEN_HEIGHT // 2  # Initialize bird_y globally
 bird_velocity = 0
-gravity = 0.5
-jump_strength = -10
 
-pipe_width = 50
-pipe_gap = 150
-pipe_velocity = -5
-
-# config.py
 SCREEN_WIDTH = 1200
 SCREEN_HEIGHT = 600
 AGENTS = 4

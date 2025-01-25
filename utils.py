@@ -29,9 +29,10 @@ def get_state(bird_x, bird_y, pipes, pipe_width, bird_velocity, pipe_velocity):
     
 # Function to create new pipes
 def create_pipe():
-    pipe_height = random.randint(100, SCREEN_HEIGHT - pipe_gap - 100)
-    top_pipe = pygame.Rect(SCREEN_WIDTH, 0, pipe_width, pipe_height)
-    bottom_pipe = pygame.Rect(SCREEN_WIDTH, pipe_height + pipe_gap, pipe_width, SCREEN_HEIGHT - pipe_height - pipe_gap)
+    """Create a pair of pipes (top and bottom) as Rect objects"""
+    gap_y = random.randint(100, SCREEN_HEIGHT - 300)
+    top_pipe = pygame.Rect(SCREEN_WIDTH, 0, PIPE_WIDTH, gap_y)
+    bottom_pipe = pygame.Rect(SCREEN_WIDTH, gap_y + 200, PIPE_WIDTH, SCREEN_HEIGHT - gap_y - 200)
     return top_pipe, bottom_pipe
 
 # Function to check collisions

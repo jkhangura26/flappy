@@ -57,45 +57,46 @@ target_net.eval()
 optimizer = torch.optim.Adam(policy_net.parameters(), lr=learning_rate)
 replay_buffer = ReplayBuffer(buffer_capacity)
 
-# Reward Configuration
-def calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width):
-    reward = 1.0 if not done else -200.0  # Heavier penalty for game over
-
-    # Penalize for hitting the top or bottom of the screen
-    if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
-        reward -= 50.0  # Increased penalty for collision with top/bottom
-
-    # Penalize for being dangerously close to the top or bottom
-    if bird_y < 50 or bird_y > SCREEN_HEIGHT - bird_size - 50:
-        reward -= 5.0  # Small penalty to discourage staying too close to edges
-
-    # Reward for surviving a frame
-    reward += 0.1  
-
-    # Reward for passing pipes (each pipe pair passed)
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            reward += 3.0  # Higher reward for successfully passing a pipe
-
-    # Additional reward for navigating through the gap successfully
-    last_score = score
-    for pipe in pipes:
-        if pipe.x + pipe_width == bird_x:  # Bird just passed a pipe
-            score += 0.5
-            if score > last_score:
-                reward += 5.0  # Extra reward for successfully avoiding obstacles
-
-    # Encourage survival for longer by rewarding staying alive
-    if high_score == 0:
-        reward += 0.1  # Small positive reward for staying alive early on
-
-    # Reward for staying in the middle portion of the screen
-    if SCREEN_HEIGHT * 0.25 < bird_y < SCREEN_HEIGHT * 0.75:
-        reward += 1.0  # Reward for staying in a safer middle zone
-
-    # Penalize collision with pipes
-    for pipe in pipes:
-        if pipe.collidepoint(bird_x, bird_y):
-            reward -= 100.0  # Major penalty for hitting pipes
-
-    return reward
+def calculate_reward(done, bird_y, bird_size, score, pipes, bird_x, high_score, SCREEN_HEIGHT, pipe_width, bird_velocity):
+    reward = 0.0
+    
+    # Primary survival reward (dense reward)
+    reward += 0.2  # Reduced from 1.0 to prevent reward hacking
+    
+    # Terminal state handling
+    if done:
+        # Split penalty into collision types
+        if bird_y <= 0 or bird_y >= SCREEN_HEIGHT - bird_size:
+            return -150.0  # Boundary collision
+        return -200.0  # Pipe collision
+    
+    # Pipe passage reward (optimized detection)
+    next_pipe = next((p for p in sorted(pipes, key=lambda x: x.x) 
+                     if p.x + pipe_width > bird_x), None)
+    
+    if next_pipe:
+        vertical_distance = abs(bird_y - (next_pipe.y + next_pipe.height/2))
+        reward += max(1.0 - vertical_distance/100, 0)  # [0, 1] reward
+        
+        # Direct pipe passage bonus
+        if next_pipe.x + pipe_width < bird_x:
+            reward += 2.0  # Successful passage
+    
+    # Positional rewards (smooth gradient)
+    ideal_y = SCREEN_HEIGHT * 0.4
+    y_distance = abs(bird_y - ideal_y)
+    reward += max(1.0 - y_distance/200, 0)  # [0, 1] reward
+    
+    # Velocity-based reward (encourage controlled movement)
+    if -8 < bird_velocity < 5:  # Good velocity range
+        reward += 0.1
+    
+    # Progressive difficulty scaling
+    difficulty_bonus = min(score / 50, 2.0)  # Max +2 bonus at 100 pipes
+    reward += difficulty_bonus
+    
+    # Exploration bonus (early training)
+    if high_score < 10:
+        reward += 0.05 * (10 - high_score)
+    
+    return min(max(reward, -1.0), 5.0)  # Clip rewards to [-1, 5]

@@ -71,11 +71,12 @@ def run_game(agents):
             # Update pipes (shared across all agents)
             current_time = pygame.time.get_ticks()
             if current_time - last_pipe_time > pipe_spawn_time:
-                pipes.extend(create_pipe())
+                top_pipe, bottom_pipe = create_pipe()
+                pipes.extend([top_pipe, bottom_pipe])  # Add both pipes as Rect objects
                 last_pipe_time = current_time
 
             # Move pipes
-            pipes = [pipe for pipe in pipes if pipe.x + pipe_width > 0]
+            pipes = [pipe for pipe in pipes if pipe.x + PIPE_WIDTH > 0]
             for pipe in pipes:
                 pipe.x += pipe_velocity
 
@@ -111,13 +112,17 @@ def run_game(agents):
                                       pipe_width, agent['bird_velocity'], pipe_velocity)
                 reward = calculate_reward(agent['done'], agent['bird_y'], bird_size,
                                          agent['score'], pipes, agent['bird_x'],
-                                         high_score, SCREEN_HEIGHT, pipe_width)
+                                         high_score, SCREEN_HEIGHT, pipe_width, agent['bird_velocity'])
                 replay_buffer.push(state, action, reward, next_state, agent['done'])
 
                 # Update score
                 for pipe in pipes:
-                    if pipe.x + pipe_width == agent['bird_x']:
-                        agent['score'] += 0.5
+                    if abs((pipe.x + pipe_width) - agent['bird_x']) < 3:
+                        # Use pipe position as unique identifier
+                        pipe_id = (pipe.x, pipe.height)
+                        if pipe_id not in agent['passed_pipes']:
+                            agent['score'] += 1
+                            agent['passed_pipes'][pipe_id] = True
 
                 # Update high score
                 if agent['score'] > high_score:
@@ -176,10 +181,11 @@ if __name__ == "__main__":
     # Initialize agents with identical starting positions
     agents = [{
         'id': i,
-        'bird_x': SCREEN_WIDTH // 4,
+        'bird_x': SCREEN_WIDTH // 4 + (i * 50),
         'bird_y': SCREEN_HEIGHT // 2,
         'bird_velocity': 0,
         'score': 0,
+        'passed_pipes': dict(),
         'done': False
     } for i in range(AGENTS)]
 
