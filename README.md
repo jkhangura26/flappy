@@ -14,4 +14,5 @@ This repository implements a Flappy Bird clone where an AI agent, trained using 
 - Game Environment: Built with PyGame, the environment includes bird, pipes, and scoring logic.
 - Deep Q-Network: A neural network approximates the Q-values for state-action pairs.
 - Replay Buffer: Stores experiences for off-policy learning.
+- Multi-Agent System: Multiple birds learn simultaneously in parallel
 
