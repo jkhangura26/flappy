@@ -45,6 +45,8 @@ def reset_game(agents):
         agent['bird_velocity'] = 0
         agent['score'] = 0
         agent['done'] = False
+        agent['passed_pipes'] = {}  # Reset passed pipes
+        agent['death_reported'] = False  # Reset death flag
 
 def run_game(agents):
     """Main game loop with multiple agents"""
@@ -83,11 +85,15 @@ def run_game(agents):
             # Update each agent
             for agent, color in zip(agents, agent_colors):
                 if agent['done']:
+                    # Print terminal update on death (only once)
+                    if not agent.get('death_reported', False):
+                        print(f"Agent {agent['id']} died with score: {agent['score']:.1f}, High Score: {int(high_score)}")
+                        agent['death_reported'] = True
                     continue
 
                 # Get current state
                 state = get_state(agent['bird_x'], agent['bird_y'], pipes, 
-                                pipe_width, agent['bird_velocity'], pipe_velocity)
+                                  pipe_width, agent['bird_velocity'], pipe_velocity)
                 state_tensor = torch.FloatTensor(state).unsqueeze(0)
 
                 # Choose action
@@ -109,13 +115,13 @@ def run_game(agents):
 
                 # Store experience
                 next_state = get_state(agent['bird_x'], agent['bird_y'], pipes,
-                                      pipe_width, agent['bird_velocity'], pipe_velocity)
+                                       pipe_width, agent['bird_velocity'], pipe_velocity)
                 reward = calculate_reward(agent['done'], agent['bird_y'], bird_size,
-                                         agent['score'], pipes, agent['bird_x'],
-                                         high_score, SCREEN_HEIGHT, pipe_width, agent['bird_velocity'])
+                                          agent['score'], pipes, agent['bird_x'],
+                                          high_score, SCREEN_HEIGHT, pipe_width, agent['bird_velocity'])
                 replay_buffer.push(state, action, reward, next_state, agent['done'])
 
-                # Update score
+                # Update score when passing pipes
                 for pipe in pipes:
                     if abs((pipe.x + pipe_width) - agent['bird_x']) <= 1:
                         # Use pipe position as unique identifier
@@ -161,12 +167,9 @@ def run_game(agents):
             for pipe in pipes:
                 pygame.draw.rect(screen, GREEN, pipe)
             
-            # Draw agents
+            # Draw agents and scores
             for agent, color in zip(agents, agent_colors):
-                # Draw bird
                 pygame.draw.rect(screen, color, (agent['bird_x'], agent['bird_y'], bird_size, bird_size))
-                
-                # Draw score
                 score_text = font.render(f"Score: {int(agent['score'])}", True, color)
                 screen.blit(score_text, (10 + agent['id'] * 200, 10))
 
@@ -185,8 +188,9 @@ if __name__ == "__main__":
         'bird_y': SCREEN_HEIGHT // 2,
         'bird_velocity': 0,
         'score': 0,
-        'passed_pipes': dict(),
-        'done': False
+        'passed_pipes': {},
+        'done': False,
+        'death_reported': False
     } for i in range(AGENTS)]
 
     run_game(agents)
