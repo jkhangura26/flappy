@@ -15,4 +15,5 @@ This repository implements a Flappy Bird clone where an AI agent, trained using 
 - Deep Q-Network: A neural network approximates the Q-values for state-action pairs.
 - Replay Buffer: Stores experiences for off-policy learning.
 - Multi-Agent System: Multiple birds learn simultaneously in parallel
+- Performance Optimizations: Fixed time-step simulation, headless mode options, and efficient collision handling.
 
